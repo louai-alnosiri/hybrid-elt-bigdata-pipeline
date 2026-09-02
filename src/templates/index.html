@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid ELT Pipeline Dashboard</title>
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon"><i class="fa-solid fa-diagram-project"></i></div>
+            <div>
+                <h1>Hybrid ELT Pipeline — لوحة المعالجة التفاعلية</h1>
+                <div class="subtitle">التوجيه والرفع التلقائي الذكي بناءً على حجم الملف (حد 200MB) بين PySpark و Python Batch</div>
+            </div>
+        </div>
+        <div>
+            <span class="db-status-badge">
+                <i class="fa-solid fa-server" style="color: var(--accent-green);"></i> MongoDB: Connected
+            </span>
+        </div>
+    </header>
+
+    <div class="grid-main">
+        <!-- Sidebar Controls -->
+        <div>
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-sliders" style="color: var(--accent-purple);"></i> قائمة الملفات المتاحة للاختيار</div>
+                
+                <!-- 1. القائمة المتاحة -->
+                <div class="form-group">
+                    <label><i class="fa-solid fa-list-check"></i> اختر ملف البيانات للبدء فيه:</label>
+                    <select id="fileSelect" onchange="onSelectChanged()" style="font-size: 15px; font-weight: bold; padding: 14px; background: #1e293b; color: #fff; border: 2px solid var(--accent-purple); cursor: pointer;">
+                        {% for f in files %}
+                            <option value="{{ f.path }}" data-size="{{ f.size_mb }}" data-sizestr="{{ f.size_str }}" data-rows="{{ f.rows_count }}" data-rowsstr="{{ f.rows_str }}">
+                                📄 {{ f.name }} — [{{ f.size_str }}]
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- 2. رفع/اختيار ملف جديد من الجهاز بالماوس -->
+                <div class="form-group" style="margin-top: 20px;">
+                    <label><i class="fa-solid fa-folder-open"></i> أو فتح استعراض الكمبيوتر لاختيار ملف آخر:</label>
+                    <div class="file-upload-box" onclick="document.getElementById('fileInput').click()">
+                        <i class="fa-solid fa-file-csv" style="font-size: 38px; color: var(--accent-purple); margin-bottom: 10px;"></i>
+                        <div id="uploadBoxText" style="font-size: 15px; font-weight: 800; color: #fff;">اضغط هنا لاختيار أي ملف CSV من حاسوبك بالماوس</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">يقوم النظام بفحص الحجم وتحديد عدد السجلات والتوجيه تلقائياً</div>
+                        <input type="file" id="fileInput" accept=".csv" style="display: none;" onchange="onFileUploaded(event)">
+                    </div>
+                </div>
+
+                <!-- Auto Routing Live Box -->
+                <div class="auto-route-card" id="autoRouteCard">
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">نتيجة الفحص والتوجيه التلقائي المحسوب</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #fff; margin: 6px 0;" id="detectedSizeText">حجم الملف: -</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #c4b5fd; margin-bottom: 8px;" id="detectedRowsText">إجمالي السجلات: -</div>
+                    <div id="detectedLoaderBadge">
+                        <span class="loader-badge badge-spark"><i class="fa-solid fa-bolt"></i> جاري التحديد التلقائي...</span>
+                    </div>
+                </div>
+
+                <!-- Custom Row Limit -->
+                <div class="form-group" style="margin-top: 16px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
+                    <label for="maxRowsInput" style="font-size: 13px; font-weight: 700; color: #fbbf24;">
+                        <i class="fa-solid fa-calculator"></i> تحديد عدد السجلات المراد معالجتها (اختياري):
+                    </label>
+                    <input type="number" id="maxRowsInput" placeholder="اتركه فارغاً لمعالجة كامل الملف" min="1" style="width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 14px; font-weight: bold; margin-top: 6px;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">يمكنك كتابة رقم محدد (مثل 5,000 أو 100,000) أو تركه فارغاً لمعالجة كافة السجلات</div>
+                </div>
+
+                <!-- Custom Rules & Quarantine Checklist -->
+                <div class="rules-accordion" style="margin-top: 16px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleRulesSection()">
+                        <div style="font-size: 13px; font-weight: 800; color: #38bdf8;">
+                            <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> تخصيص قواعد المعالجة والعزل المطلوبة
+                        </div>
+                        <span id="rulesToggleIcon" style="color: var(--text-muted); font-size: 12px;"><i class="fa-solid fa-chevron-down"></i></span>
+                    </div>
+
+                    <div id="rulesConfigBody" style="display: block; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-size: 11px; color: #34d399; font-weight: 700; cursor: pointer;" onclick="toggleAllRules(true)">✓ تحديد الكل</span>
+                            <span style="font-size: 11px; color: #f87171; font-weight: 700; cursor: pointer;" onclick="toggleAllRules(false)">✗ إلغاء الكل</span>
+                        </div>
+
+                        <!-- Quality Rules -->
+                        <div style="font-size: 11px; font-weight: 700; color: #fbbf24; margin-bottom: 4px;">🧹 قواعد التنظيف والتصحيح:</div>
+                        <div class="rules-grid-box">
+                            <label class="rule-check-item"><input type="checkbox" id="rule_phone" checked> توحيد مفتاح الهاتف (+967)</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_currency" checked> توحيد العملة لـ YER</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_date" checked> توحيد التواريخ (ISO)</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_email" checked> تصحيح البريد الإلكتروني</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_numeric" checked> تنظيف الأرقام والرموز</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_text" checked> تنظيف النصوص والمدن</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_items" checked> فك وتنظيف مصفوفات العناصر</label>
+                            <label class="rule-check-item"><input type="checkbox" id="rule_total_recalc" checked> مطابقة وإعادة حساب الإجمالي</label>
+                        </div>
+
+                        <!-- Quarantine Rules -->
+                        <div style="font-size: 11px; font-weight: 700; color: #f87171; margin-top: 8px; margin-bottom: 4px;">⛔ صفات وقواعد العزل (Quarantine):</div>
+                        <div class="rules-grid-box">
+                            <label class="rule-check-item"><input type="checkbox" id="q_order_id" checked> عزل غياب معرف الطلب (order_id)</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_customer_id" checked> عزل غياب معرف العميل (customer_id)</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_date" checked> عزل التواريخ المستحيلة والتالفة</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_items_json" checked> عزل مصفوفات العناصر التالفة</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_items_empty" checked> عزل الطلبات ذات العناصر الفارغة</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_price_unknown" checked> عزل الأسعار غير المعروفة (???)</label>
+                            <label class="rule-check-item"><input type="checkbox" id="q_negative" checked> عزل القيم السالبة والملتبسة</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checkbox-group" style="margin-top: 14px;">
+                    <input type="checkbox" id="resetDb">
+                    <label for="resetDb">
+                        <i class="fa-solid fa-triangle-exclamation"></i> تصفير وحذف الكولكشنات قبل التشغيل (--reset)
+                    </label>
+                </div>
+
+                <button class="btn-run" id="runBtn" onclick="startPipeline()">
+                    <i class="fa-solid fa-play"></i> بدء المعالجة التلقائية
+                </button>
+
+                <div class="status-box status-idle" id="statusBox">
+                    <i class="fa-solid fa-circle-info"></i> <span id="statusMessage">جاهز لبدء المعالجة</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressFill"></div>
+                </div>
+
+                <!-- Live Progress Counters Box -->
+                <div class="live-progress-box" id="liveProgressBox" style="display: none;">
+                    <div class="live-counters-grid">
+                        <div class="live-counter-item" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12);">
+                            <span class="live-counter-label">عُولج حتى الآن</span>
+                            <div class="live-counter-val" id="cntProcessed" style="color: #60a5fa;">0</div>
+                        </div>
+                        <div class="live-counter-item" style="border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.12);">
+                            <span class="live-counter-label">المتبقي للمعالجة</span>
+                            <div class="live-counter-val" id="cntRemaining" style="color: #fbbf24;">0</div>
+                        </div>
+                        <div class="live-counter-item" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.12);">
+                            <span class="live-counter-label">إجمالي السجلات</span>
+                            <div class="live-counter-val" id="cntTotal" style="color: #c084fc;">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resource Info Card (Dynamic upon Run) -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-microchip" style="color: var(--accent-blue);"></i> تخصيص الموارد ومراقبة الجهاز (RAM & CPU)</div>
+                <div class="resource-info-list" id="resourceInfo">
+                    • <b>الأنوية (CPU):</b> <span id="resCores" style="color: var(--text-muted);">سيتم الحساب عند بدء التشغيل...</span><br>
+                    • <b>الذاكرة المستهلكة حالياً:</b> <span id="resRamUsed" style="color: #f87171; font-weight: 700;">- GB</span><br>
+                    • <b>الذاكرة المتبقية للجهاز:</b> <span id="resRamFree" style="color: #34d399; font-weight: 700;">- GB</span><br>
+                    • <b>حجم الدفعة (Batch Size):</b> <span id="resBatch" style="color: #fbbf24; font-weight: 800;">- سجل/دفعة</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard View -->
+        <div>
+            <!-- Resumption Checkpoint Notice Banner -->
+            <div class="resume-banner" id="resumeBanner" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 16px; font-weight: 800; color: #c4b5fd;">
+                        <i class="fa-solid fa-rotate-right fa-spin-pulse" style="color: var(--accent-purple); margin-left: 8px;"></i>
+                        استئناف المعالجة: تمت إضافة باقي الصفوف بنجاح
+                    </div>
+                    <span class="resume-tag">🔄 Resumed Checkpoint</span>
+                </div>
+                <div style="font-size: 13px; color: #e2e8f0; line-height: 1.6; margin-bottom: 12px;">
+                    ℹ️ تمت معالجة هذا الملف سابقاً وانقطع/فصل. قام النظام بتخطي الصفوف السابقة واستكمال إضافة الصفوف المتبقية دون تكرار البيانات.
+                </div>
+                <div class="resume-stats-flex">
+                    <div class="resume-stat-box" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.12);">
+                        <span style="font-size: 12px; color: var(--text-muted);">📌 الصفوف المعالجة سابقاً:</span>
+                        <div style="font-size: 18px; font-weight: 800; color: #a78bfa;" id="resumePrevRows">0</div>
+                    </div>
+                    <div class="resume-stat-box" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.12);">
+                        <span style="font-size: 12px; color: var(--text-muted);">➕ الصفوف الجديدة المُضافة الآن:</span>
+                        <div style="font-size: 18px; font-weight: 800; color: #34d399;" id="resumeNewRows">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Consistency Banner -->
+            <div class="formula-banner" id="formulaBanner" style="display: none;">
+                <div>
+                    <div class="formula-title">إثبات معادلة الاتساق الإلزامية</div>
+                    <div class="formula-text" id="formulaExpr">run_raw = run_valid + run_corrected + run_quarantine</div>
+                </div>
+                <div class="formula-badge" id="formulaBadge">✓ محققة (True)</div>
+            </div>
+
+            <!-- Metric Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card" style="--accent-color: var(--accent-blue);">
+                    <div class="metric-label">إجمالي السجلات الخام (Raw)</div>
+                    <div class="metric-value" id="valRaw">-</div>
+                    <div class="metric-sub">كولكشن orders_raw</div>
+                </div>
+
+                <div class="metric-card" style="--accent-color: var(--accent-green);">
+                    <div class="metric-label">السجلات السليمة (Valid)</div>
+                    <div class="metric-value" id="valValid" style="color: #34d399;">-</div>
+                    <div class="metric-sub">بدون أي تعديل</div>
+                </div>
+
+                <div class="metric-card" style="--accent-color: var(--accent-amber);">
+                    <div class="metric-label">السجلات المصححة (Corrected)</div>
+                    <div class="metric-value" id="valCorrected" style="color: #fbbf24;">-</div>
+                    <div class="metric-sub">تم تصحيحها + Audit Trail</div>
+                </div>
+
+                <div class="metric-card" style="--accent-color: var(--accent-red);">
+                    <div class="metric-label">السجلات المعزولة (Quarantine)</div>
+                    <div class="metric-value" id="valQuarantine" style="color: #f87171;">-</div>
+                    <div class="metric-sub">أخطاء جوهرية لا صيانة لها</div>
+                </div>
+            </div>
+
+            <!-- Pipeline Info Summary -->
+            <div class="card">
+                <div class="summary-flex">
+                    <div>
+                        <span class="summary-label">المحمّل المختار تلقائياً بناءً على الحجم:</span>
+                        <div id="loaderBadgeContainer">
+                            <span class="loader-badge badge-python"><i class="fa-brands fa-python"></i> Python Batch Loader</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="summary-label">حجم الدفعة الديناميكي (Batch Size):</span>
+                        <div class="summary-val-highlight" id="batchSizeHighlight" style="color: #fbbf24;">- سجل/دفعة</div>
+                    </div>
+                    <div>
+                        <span class="summary-label">المدة الإجمالية المستغرقة:</span>
+                        <div class="summary-val-highlight" id="durationVal">- ثانية</div>
+                    </div>
+                    <div>
+                        <span class="summary-label">معرّف التشغيل الحالي (Run ID):</span>
+                        <div class="summary-val" id="runIdVal">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-chart-pie" style="color: var(--accent-green);"></i> تحليل النتائج وقواعد التنظيف والعزل</div>
+                <div class="charts-grid">
+                    <div class="chart-box">
+                        <canvas id="quarantineChart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="rulesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

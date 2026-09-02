@@ -1,0 +1,51 @@
+{
+  "id_run": "run_2026-08-29T20:06:37",
+  "run_id": "run_2026-08-29T20:06:37",
+  "file_name": "part_250MB.csv",
+  "file_size_mb": 250.0,
+  "engine_used": "spark_loader",
+  "run_started_at": "2026-08-29T20:06:37.809050+00:00",
+  "run_finished_at": "2026-08-29T20:09:52.090111+00:00",
+  "read_rows": 596857,
+  "raw_loaded": 596857,
+  "run_raw_count": 596857,
+  "count_valid": 27450311,
+  "run_valid_count": 27450311,
+  "count_corrected": 0,
+  "run_corrected_count": 0,
+  "count_quarantine": 2130403,
+  "run_quarantine_count": 2130403,
+  "elapsed_seconds": 194.28,
+  "duration_seconds": 194.28,
+  "throughput": 3072.15,
+  "throughput_str": "3,072.15 سجل/ثانية",
+  "batch_size_or_partitions": 50000,
+  "inserted_count": 27450311,
+  "updated_count": 0,
+  "unchanged_count": 0,
+  "is_resumed": true,
+  "previously_processed_rows": 29580714,
+  "new_rows_added": 4165,
+  "resume_message": "تتم الآن إضافة باقي الصفوف واستكمال المعالجة",
+  "consistency_check": false,
+  "consistency_formula": "596857 = 27450311 + 0 + 2130403",
+  "error_case_counts": {
+    "ID_ORDER_MISSING": 4165
+  },
+  "top_quarantine_reasons": {
+    "ID_ORDER_MISSING": 4165
+  },
+  "top_correction_rules": {},
+  "resources": {
+    "cores_allocated": 7,
+    "total_cores": 8,
+    "memory_allocated_gb": 3.9,
+    "memory_limit_gb": 3.9,
+    "memory_spark_str": "3g",
+    "total_memory_gb": 15.9,
+    "available_memory_gb": 4.9,
+    "dynamic_batch_size": 50000,
+    "mem_fraction_used": 0.8,
+    "leave_cores_used": 1
+  }
+}

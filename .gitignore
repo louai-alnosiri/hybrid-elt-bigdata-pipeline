@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large Datasets (>100MB cannot be pushed to GitHub)
+data/orders_huge_mixed_quality.csv
+data/orders_huge_30m.csv
+data/output/
+data/part_*.csv
+*.csv
+
+# Exceptions: Keep small sample file and keep data folder tracked
+!data/
+!data/orders_sample_small.csv
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE / Editor folders
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS Generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Temporary & Log files
+*.log
+scratch/
